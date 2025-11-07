@@ -1,0 +1,28 @@
+spring:
+  config.activate.on-profile: prod
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=utf8mb4&useSSL=true&requireSSL=true&serverTimezone=UTC
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:50}
+      minimum-idle: ${DB_POOL_MIN:5}
+      leak-detection-threshold: 0
+  jpa:
+    show-sql: false
+    hibernate.ddl-auto: validate
+
+  data:
+    redis:
+      host: redis.internal
+      port: 6379
+      password: ${REDIS_PASSWORD}
+
+management.tracing.sampling.probability: ${TRACING_SAMPLE:0.1}
+logging.level.root: INFO
+
+springdoc:
+  api-docs.enabled: false
+  swagger-ui.enabled: false
+
