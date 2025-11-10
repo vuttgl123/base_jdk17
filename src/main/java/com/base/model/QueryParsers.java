@@ -1,7 +1,5 @@
 package com.base.model;
 
-import com.base.model.BaseSpecification;
-import com.base.model.Filter;
 import com.base.model.entity.BaseEntity;
 import com.base.model.enumeration.FilterOp;
 import com.base.model.enumeration.Scope;

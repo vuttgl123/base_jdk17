@@ -14,6 +14,7 @@ public class MdcConfig {
     /**
      * Đăng ký TaskExecutor có MDC context cho các @Async method.
      */
+
     @Bean
     public ThreadPoolTaskExecutor mdcTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

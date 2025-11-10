@@ -22,14 +22,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtTokenProvider tokenProvider;
-    private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     public SecurityConfig(JwtTokenProvider tokenProvider,
                           UserDetailsService userDetailsService) {
-        this.tokenProvider = tokenProvider;
-        this.userDetailsService = userDetailsService;
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(tokenProvider, userDetailsService);
     }
 
