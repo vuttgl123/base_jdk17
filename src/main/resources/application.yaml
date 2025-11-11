@@ -2,6 +2,7 @@ spring:
   application:
     name: base
 
+  # ===== Database Configuration =====
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${DB_HOST:10.210.40.40}:${DB_PORT:3306}/${DB_NAME:user_data}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -9,65 +10,153 @@ spring:
     password: ${DB_PASSWORD:ILoveKYC}
 
     hikari:
+      # Connection pool sizing
       maximum-pool-size: 50
-      minimum-idle: 2
+      minimum-idle: 5  # Tăng từ 2 -> 5 để giảm latency khi có burst traffic
+
+      # Timeout settings (ms)
       connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      idle-timeout: 600000      # 10 phút
+      max-lifetime: 1800000     # 30 phút
+      validation-timeout: 5000  # Thêm validation timeout
+
+      # Performance
       auto-commit: true
+
+      # Monitoring
       leak-detection-threshold: 60000
+
+      # Statement caching for better performance
       data-source-properties:
-        cachePrepStats: true
+        cachePrepStmts: true
         prepStmtCacheSize: 250
         prepStmtCacheSqlLimit: 2048
-        useServerPrepStats: true
+        useServerPrepStmts: true
+        useLocalSessionState: true       # Giảm roundtrips
+        rewriteBatchedStatements: true   # Tối ưu batch operations
+        #        cacheResultSetMetadata: true     # Cache metadata
+        #        cacheServerConfiguration: true   # Cache server config
+        maintainTimeStats: false         # Tắt time stats (overhead)
 
+  # ===== JPA Configuration =====
   jpa:
     database: mysql
-    open-in-view: false
-    show-sql: false
+    open-in-view: false  # Quan trọng: tránh N+1 và lazy loading issues
+    show-sql: false      # Chỉ bật trong dev
+
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate  # THAY ĐỔI: update -> validate (production-safe)
+
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
+        format_sql: false  # Tắt trong production
 
-    data:
-      redis:
-        host: ${REDIS_HOST:10.210.40.176}
-        port: ${REDIS_PORT:6379}
-        password: ${REDIS_PASSWORD:}
-        timeout: 2000ms
+        # Query optimization
+        jdbc:
+          batch_size: 50              # Batch inserts/updates
+          fetch_size: 100             # Fetch size cho large queries
+        order_inserts: true           # Tối ưu batch inserts
+        order_updates: true           # Tối ưu batch updates
 
-    cache:
-      type: redis
+        # Cache configuration
+        #        cache:
+        #          use_second_level_cache: true
+        #          use_query_cache: true
+        #          region:
+        #            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
 
+        # Statistics (disable in prod)
+        generate_statistics: false
+
+      # ===== Redis Configuration =====
+      #  data:
+      #    redis:
+      #      host: ${REDIS_HOST:10.210.40.176}
+      #      port: ${REDIS_PORT:6379}
+      #      password: ${REDIS_PASSWORD:}
+      #      timeout: 2000ms
+
+      # Connection pool optimization
+      lettuce:
+        pool:
+          max-active: 16      # Số connection tối đa
+          max-idle: 8         # Số connection idle tối đa
+          min-idle: 2         # Số connection idle tối thiểu
+          max-wait: 2000ms    # Thời gian chờ connection
+          time-between-eviction-runs: 60s
+
+  # ===== Cache Configuration =====
+  #  cache:
+  #    type: redis
+  #    redis:
+  #      time-to-live: 3600000  # 1 giờ default TTL
+  #      cache-null-values: false  # Không cache null
+  #      use-key-prefix: true
+
+  # ===== Async Task Execution =====
   task:
     execution:
       pool:
         core-size: 8
-        max-size: 16
+        max-size: 32
         queue-capacity: 1000
-      thread-name-prefix: async-
+        keep-alive: 60s        # Thread timeout
+      thread-name-prefix: "app-async-"
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
 
-
-server:
-  port: ${SERVER_PORT:8080}
-
+# ===== Logging Configuration =====
 logging:
   level:
     root: INFO
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql: WARN
+    com.base: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}  # Có thể override
+    com.zaxxer.hikari: INFO
 
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n"
+
+  # File logging (optional, tách biệt với logback.xml)
+  file:
+    name: logs/${spring.application.name}.log
+    max-size: 100MB
+    max-history: 7
+
+# ===== Management & Monitoring =====
 management:
   endpoints:
-    web.exposure.include: health,info,prometheus
-  endpoint.health.probes.enabled: true
-  tracing.sampling.probability: 1.0
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
-springdoc:
+# ===== Server Configuration =====
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    max-connections: 10000
+    accept-count: 100
+    connection-timeout: 20s
+
+# ===== Swagger Configuration =====
+
+spring-doc:
   api-docs:
     enabled: true
     path: /v3/api-docs
@@ -78,9 +167,8 @@ springdoc:
     tryItOutEnabled: true
     filter: true
 
+# ===== JWT Configuration =====
 security:
   jwt:
     private-key-path: ./src/main/resources/keys/jwtRS256-private.pem
     public-key-path:  ./src/main/resources/keys/jwtRS256-public.pem
-
-

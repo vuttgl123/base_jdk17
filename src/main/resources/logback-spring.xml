@@ -1,51 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration scan="true" scanPeriod="30 seconds" packagingData="true">
-    <property name="APP_NAME" value="${spring.application.name:-my-service}" />
+<configuration scan="true" scanPeriod="60 seconds">
+    <!-- ===== Properties ===== -->
+    <property name="APP_NAME" value="${spring.application.name:-base-service}" />
     <property name="LOG_DIR" value="${LOG_DIR:-logs}" />
-    <property name="LOG_FILE" value="${LOG_FILE:-${LOG_DIR}/${APP_NAME}.log}" />
-    <property name="TZ" value="${LOG_TZ:-UTC}" />
+    <property name="TZ" value="${LOG_TZ:-Asia/Ho_Chi_Minh}" />
+
     <contextName>${APP_NAME}</contextName>
 
-    <timestamp key="byDay" datePattern="yyyy-MM-dd"/>
+    <!-- ===== Console Pattern cho DEV ===== -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSS,${TZ}} %highlight(%-5level) [%thread] %cyan(%logger{36}) [%X{correlationId:-N/A}] - %msg%n%ex{short}"/>
 
-    <!-- DEV -->
+    <!-- ===== DEV Console Appender ===== -->
     <appender name="DEV_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <immediateFlush>true</immediateFlush>
         <encoder>
-            <pattern>%date{yyyy-MM-dd'T'HH:mm:ss.SSS,${TZ}} [%thread] %-5level %logger{36} - %msg | traceId=%X{traceId:-} spanId=%X{spanId:-} corrId=%X{correlationId:-}%n%ex{full}</pattern>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <!-- PROD JSON console -->
+    <!-- ===== JSON Console Appender cho Production ===== -->
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <jsonFactoryDecorator class="net.logstash.logback.decorate.MaskingJsonFactoryDecorator">
-                <maskPatterns>
-                    <maskPattern>\b\d{12,19}\b</maskPattern>
-                    <maskPattern>(?i)authorization:\s*Bearer\s+[A-Za-z0-9\._\-]+</maskPattern>
-                    <maskPattern>(?i)"password"\s*:\s*".*?"</maskPattern>
-                </maskPatterns>
-            </jsonFactoryDecorator>
+            <!-- Masking sensitive data -->
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <defaultMask>***MASKED***</defaultMask>
+                <path>password</path>
+                <path>token</path>
+                <path>secret</path>
+                <path>authorization</path>
+                <path>apiKey</path>
+                <path>api_key</path>
+            </jsonGeneratorDecorator>
+
             <providers>
-                <timestamp><timeZone>${TZ}</timeZone><fieldName>@timestamp</fieldName></timestamp>
-                <logLevel/>
-                <loggerName/>
-                <threadName/>
-                <mdc/>        <!-- hoặc whitelist includeMdcKeyName -->
-                <context/>
-                <pattern>
-                    <pattern>
-                        {
-                        "message":"%replace(%message){'(?s)\\n','\\\\n'}",
-                        "service":"${APP_NAME}"
-                        }
-                    </pattern>
-                </pattern>
+                <!-- Timestamp -->
+                <timestamp>
+                    <timeZone>${TZ}</timeZone>
+                    <fieldName>@timestamp</fieldName>
+                </timestamp>
+
+                <!-- Basic fields -->
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                </loggerName>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+
+                <!-- MDC context -->
+                <mdc>
+                    <includeMdcKeyName>correlationId</includeMdcKeyName>
+                    <includeMdcKeyName>traceId</includeMdcKeyName>
+                    <includeMdcKeyName>spanId</includeMdcKeyName>
+                    <includeMdcKeyName>userId</includeMdcKeyName>
+                </mdc>
+
+                <!-- Message -->
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+
+                <!-- Arguments (nếu có) -->
+                <arguments>
+                    <includeNonStructuredArguments>false</includeNonStructuredArguments>
+                    <nonStructuredArgumentsFieldPrefix>arg</nonStructuredArgumentsFieldPrefix>
+                </arguments>
+
+                <!-- Custom fields -->
+                <globalCustomFields>
+                    <customFields>{"service":"${APP_NAME}","environment":"${SPRING_PROFILES_ACTIVE:-default}"}</customFields>
+                </globalCustomFields>
+
+                <!-- Stack trace -->
                 <stackTrace>
                     <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
-                        <maxDepthPerThrowable>50</maxDepthPerThrowable>
-                        <maxLength>8192</maxLength>
-                        <shortenedClassNameLength>20</shortenedClassNameLength>
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>4096</maxLength>
+                        <shortenedClassNameLength>25</shortenedClassNameLength>
+                        <rootCauseFirst>true</rootCauseFirst>
+                        <exclude>sun\.reflect\..*</exclude>
+                        <exclude>java\.lang\.reflect\..*</exclude>
                     </throwableConverter>
                     <fieldName>stack_trace</fieldName>
                 </stackTrace>
@@ -53,49 +91,61 @@
         </encoder>
     </appender>
 
-    <!-- Rolling file JSON -->
+    <!-- ===== Rolling File Appender ===== -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_FILE}</file>
+        <file>${LOG_DIR}/${APP_NAME}.log</file>
+
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
-            <maxFileSize>50MB</maxFileSize>
-            <maxHistory>14</maxHistory>
-            <totalSizeCap>2GB</totalSizeCap>
+            <fileNamePattern>${LOG_DIR}/${APP_NAME}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
             <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
+
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <jsonFactoryDecorator class="net.logstash.logback.decorate.MaskingJsonFactoryDecorator">
-                <maskPatterns>
-                    <maskPattern>\b\d{12,19}\b</maskPattern>
-                    <maskPattern>(?i)authorization:\s*Bearer\s+[A-Za-z0-9\._\-]+</maskPattern>
-                    <maskPattern>(?i)"password"\s*:\s*".*?"</maskPattern>
-                </maskPatterns>
-            </jsonFactoryDecorator>
             <providers>
-                <timestamp><timeZone>${TZ}</timeZone><fieldName>@timestamp</fieldName></timestamp>
-                <logLevel/><loggerName/><threadName/><mdc/><context/>
-                <pattern>
-                    <pattern>{ "message":"%replace(%message){'(?s)\\n','\\\\n'}", "service":"${APP_NAME}" }</pattern>
-                </pattern>
+                <timestamp>
+                    <timeZone>${TZ}</timeZone>
+                </timestamp>
+                <logLevel/>
+                <loggerName/>
+                <threadName/>
+                <mdc/>
+                <message/>
+                <globalCustomFields>
+                    <customFields>{"service":"${APP_NAME}"}</customFields>
+                </globalCustomFields>
                 <stackTrace>
-                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter"/>
-                    <fieldName>stack_trace</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>50</maxDepthPerThrowable>
+                        <maxLength>8192</maxLength>
+                    </throwableConverter>
                 </stackTrace>
             </providers>
         </encoder>
     </appender>
 
-    <!-- Async -->
+    <!-- ===== Async Appenders (Performance Optimization) ===== -->
     <appender name="ASYNC_JSON" class="ch.qos.logback.classic.AsyncAppender">
-        <queueSize>8192</queueSize>
+        <queueSize>4096</queueSize>
         <discardingThreshold>0</discardingThreshold>
         <neverBlock>true</neverBlock>
-        <includeCallerData>true</includeCallerData>
+        <includeCallerData>false</includeCallerData>
+        <maxFlushTime>3000</maxFlushTime>
         <appender-ref ref="JSON_CONSOLE"/>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>2048</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <includeCallerData>false</includeCallerData>
+        <maxFlushTime>3000</maxFlushTime>
         <appender-ref ref="FILE"/>
     </appender>
 
-    <!-- Profiles -->
+    <!-- ===== Environment-specific Root Loggers ===== -->
     <springProfile name="dev,local,default">
         <root level="INFO">
             <appender-ref ref="DEV_CONSOLE"/>
@@ -105,16 +155,40 @@
     <springProfile name="prod,uat,staging">
         <root level="INFO">
             <appender-ref ref="ASYNC_JSON"/>
+            <appender-ref ref="ASYNC_FILE"/>
         </root>
     </springProfile>
 
-    <!-- Noisy libs -->
+    <!-- ===== Application Loggers ===== -->
+    <logger name="com.base" level="DEBUG" additivity="false">
+        <springProfile name="dev,local,default">
+            <appender-ref ref="DEV_CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod,uat,staging">
+            <appender-ref ref="ASYNC_JSON"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </springProfile>
+    </logger>
+
+    <!-- ===== Third-party Library Loggers ===== -->
     <logger name="org.springframework" level="INFO"/>
     <logger name="org.springframework.web" level="INFO"/>
     <logger name="org.springframework.security" level="WARN"/>
-    <logger name="org.hibernate.SQL" level="WARN"/>
-    <logger name="org.hibernate.type.descriptor.sql" level="WARN"/>
+    <logger name="org.springframework.data" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.hibernate.SQL" level="DEBUG">
+        <springProfile name="dev,local">
+            <!-- Chỉ show SQL trong dev -->
+        </springProfile>
+        <springProfile name="prod,uat,staging">
+            <level value="WARN"/>
+        </springProfile>
+    </logger>
     <logger name="org.apache.catalina" level="WARN"/>
     <logger name="reactor.netty" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+
+    <!-- Giảm noise từ health checks -->
+    <logger name="org.springframework.boot.actuate" level="WARN"/>
 </configuration>

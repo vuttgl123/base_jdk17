@@ -13,8 +13,8 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
-public class OrderItem extends BaseEntity {
+@EqualsAndHashCode(callSuper = false)
+public class OrderItem {
 
     @EmbeddedId
     private OrderItemId id;

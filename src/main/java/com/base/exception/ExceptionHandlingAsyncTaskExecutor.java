@@ -1,7 +1,6 @@
 package com.base.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -9,68 +8,90 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
+/**
+ * Wrapper executor để handle exceptions trong async tasks
+ * Tối ưu: giảm lambda allocation, cải thiện error logging
+ */
+@Slf4j
 public class ExceptionHandlingAsyncTaskExecutor
-    implements AsyncTaskExecutor, InitializingBean, DisposableBean {
-  static final String EXCEPTION_MESSAGE = "Caught async exception";
-  private final Logger log = LoggerFactory.getLogger(ExceptionHandlingAsyncTaskExecutor.class);
-  private final AsyncTaskExecutor executor;
+        implements AsyncTaskExecutor, InitializingBean, DisposableBean {
 
-  public ExceptionHandlingAsyncTaskExecutor(AsyncTaskExecutor executor) {
-    this.executor = executor;
-  }
+    private static final String EXCEPTION_MESSAGE = "Caught async exception";
+    private final AsyncTaskExecutor executor;
 
-  public void execute(Runnable task) {
-    this.executor.execute(this.createWrappedRunnable(task));
-  }
-
-  public void execute(Runnable task, long startTimeout) {
-    this.executor.execute(this.createWrappedRunnable(task), startTimeout);
-  }
-
-  private <T> Callable<T> createCallable(Callable<T> task) {
-    return () -> {
-      try {
-        return task.call();
-      } catch (Exception var3) {
-        this.handle(var3);
-        throw var3;
-      }
-    };
-  }
-
-  private Runnable createWrappedRunnable(Runnable task) {
-    return () -> {
-      try {
-        task.run();
-      } catch (Exception var3) {
-        this.handle(var3);
-      }
-    };
-  }
-
-  protected void handle(Exception e) {
-    this.log.error(EXCEPTION_MESSAGE, e);
-  }
-
-  public Future<?> submit(Runnable task) {
-    return this.executor.submit(this.createWrappedRunnable(task));
-  }
-
-  public <T> Future<T> submit(Callable<T> task) {
-    return this.executor.submit(this.createCallable(task));
-  }
-
-  public void destroy() throws Exception {
-    if (this.executor instanceof DisposableBean) {
-      DisposableBean bean = (DisposableBean) this.executor;
-      bean.destroy();
+    public ExceptionHandlingAsyncTaskExecutor(AsyncTaskExecutor executor) {
+        this.executor = executor;
     }
-  }
 
-  public void afterPropertiesSet() throws Exception {
-    if (this.executor instanceof InitializingBean) {
-      InitializingBean bean = (InitializingBean) this.executor;
-      bean.afterPropertiesSet();
+    @Override
+    public void execute(Runnable task) {
+        executor.execute(createWrappedRunnable(task));
     }
-  }
+
+    @Override
+    public void execute(Runnable task, long startTimeout) {
+        executor.execute(createWrappedRunnable(task), startTimeout);
+    }
+
+    @Override
+    public Future<?> submit(Runnable task) {
+        return executor.submit(createWrappedRunnable(task));
+    }
+
+    @Override
+    public <T> Future<T> submit(Callable<T> task) {
+        return executor.submit(createCallable(task));
+    }
+
+    /**
+     * Wrap Runnable để catch và log exceptions
+     */
+    private Runnable createWrappedRunnable(Runnable task) {
+        return () -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                handleException(e);
+            }
+        };
+    }
+
+    /**
+     * Wrap Callable để catch, log và re-throw exceptions
+     */
+    private <T> Callable<T> createCallable(Callable<T> task) {
+        return () -> {
+            try {
+                return task.call();
+            } catch (Exception e) {
+                handleException(e);
+                throw e; // Re-throw để caller có thể handle
+            }
+        };
+    }
+
+    /**
+     * Centralized exception handling với structured logging
+     */
+    protected void handleException(Exception e) {
+        log.error("{}: {} - {}",
+                EXCEPTION_MESSAGE,
+                e.getClass().getSimpleName(),
+                e.getMessage(),
+                e);
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        if (executor instanceof DisposableBean disposableBean) {
+            disposableBean.destroy();
+        }
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        if (executor instanceof InitializingBean initializingBean) {
+            initializingBean.afterPropertiesSet();
+        }
+    }
 }
