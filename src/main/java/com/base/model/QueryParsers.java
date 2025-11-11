@@ -1,6 +1,6 @@
 package com.base.model;
 
-import com.base.model.entity.BaseEntity;
+import com.base.model.entity.BaseEntity3;
 import com.base.model.enumeration.FilterOp;
 import com.base.model.enumeration.Scope;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,7 +57,7 @@ public final class QueryParsers {
         return result;
     }
 
-    public static <T extends BaseEntity> Specification<T> buildSpecification(String keyword, List<String> keywordFields, List<Filter> filters, Scope scope) {
+    public static <T extends BaseEntity3> Specification<T> buildSpecification(String keyword, List<String> keywordFields, List<Filter> filters, Scope scope) {
         Specification<T> spec = BaseSpecification.scope(scope);
         if (!BaseSpecification.isBlank(keyword) && keywordFields != null && !keywordFields.isEmpty()) {
             Specification<T> orSpec = null;

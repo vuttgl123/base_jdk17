@@ -1,8 +1,8 @@
 package com.base.service.impl;
 
-import com.base.model.entity.BaseEntity;
+import com.base.model.entity.BaseEntity3;
 import com.base.model.mapper.BaseMapper;
-import com.base.repository.BaseRepository;
+import com.base.repository.BaseRepository2;
 import com.base.service.inter.BaseService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public abstract class BaseServiceImpl<T extends BaseEntity, RQ, RS>
+public abstract class BaseServiceImpl<T extends BaseEntity3, RQ, RS>
         implements BaseService<T, RQ, RS> {
 
 
-    protected final BaseRepository<T> repository;
+    protected final BaseRepository2<T> repository;
     protected final BaseMapper<T, RQ, RS> mapper;
 
 

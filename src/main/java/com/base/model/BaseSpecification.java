@@ -1,6 +1,6 @@
 package com.base.model;
 
-import com.base.model.entity.BaseEntity;
+import com.base.model.entity.BaseEntity3;
 import com.base.model.enumeration.Scope;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -10,7 +10,7 @@ public final class BaseSpecification {
     private BaseSpecification() {}
 
 
-    public static <T extends BaseEntity> Specification<T> scope(Scope scope) {
+    public static <T extends BaseEntity3> Specification<T> scope(Scope scope) {
         if (scope == null || scope == Scope.ACTIVE) {
             return (root, query, cb) -> cb.isFalse(root.get("deleted"));
         }

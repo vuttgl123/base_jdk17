@@ -1,7 +1,7 @@
 package com.base.controller;
 
 import com.base.model.QueryParsers;
-import com.base.model.entity.BaseEntity;
+import com.base.model.entity.BaseEntity3;
 import com.base.model.enumeration.Scope;
 import com.base.service.inter.BaseService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-public abstract class BaseController<T extends BaseEntity, RQ, RS> {
+public abstract class BaseController<T extends BaseEntity3, RQ, RS> {
     protected abstract BaseService<T, RQ, RS> service();
     protected List<String> keywordFields() { return List.of(); }
     protected Specification<T> extraSpec() { return null; }

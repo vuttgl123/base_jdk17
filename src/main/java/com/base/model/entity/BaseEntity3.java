@@ -11,7 +11,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @ToString
-public abstract class BaseEntity {
+public abstract class BaseEntity3 {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
